@@ -11,7 +11,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include <ctype.h>
 #include "XnCppWrapper.h"
-
+#include <vld.h>
 
 const int NUM_SENSORS = 3;
 const int TOTAL_SUBINTERVAL_MOA = 4;
@@ -35,11 +35,13 @@ rgbMap(in): Map of rgb colours for a particular kinect
 */
 void updateActivityMap(Mat& activityMap, Mat& activityMap_back, const ActivityMap_Utils* am, const XnPoint3D* p3D, const int nP, const XnPoint3D* points2D)
 {
+	int tRows = activityMap.rows;
+	int tCols = activityMap.cols;
 	for (int i = 0; i < nP; i++)
 	{
 		Point p2D = ActivityMap_Utils::findMoACoordinate(&p3D[i], MAX_RANGE);
 
-		if (p2D.x != -1)
+		if (p2D.x != -1 && p2D.x > 0 && p2D.x < tCols && p2D.y > 0 && p2D.y < tRows)
 		{
 			uchar* ptr = activityMap.ptr<uchar>(p2D.y);
 			uchar* ptr_back = activityMap_back.ptr<uchar>(p2D.y);
@@ -403,7 +405,7 @@ int main(int argc, char* argv[])
 	bool saved = false;
 	int fromVideo = 0;
 	int recordOut = 1;
-	int tilt = -40;
+	int tilt = -50;
 
 	char* paths[3];
 	paths[0] = "d:/Emilio/Tracking/DataSet/kinect0_calib.oni";
@@ -511,7 +513,7 @@ int main(int argc, char* argv[])
 
 	int nPoints = 0;
 	int frames = 0;
-	while (!bShouldStop && frames <= 530)
+	while (!bShouldStop && frames <= 1000)
 	{		
 		cout << "Frames: " << frames << endl;
 		for (int i = 0; i < NUM_SENSORS; i++)
@@ -528,23 +530,23 @@ int main(int argc, char* argv[])
 			//Creates a matrxi with depth values (ushort)
 			createDepthMatrix(depthMaps[i], depthMat[i]);
 
-			if (i == REF_CAM)
-			{
-				startTime = clock();
-				//Mask out the complete ROI
-				//maskOutOverlapping(depthMat[i], rLeft, rRight);
-				//Selective Mask out
-				//maskOutOverlappingSelective(depthMat[i], rLeft, rRight);
-				//Selective Mask Out Edge
-				//maskOutOverlappingEdge(depthMat[0], depthMat[1], depthMat[2]);
-				//Selective Points Mask out 
-				maskOutOverlappingPointSel(depthMat[i], rLeft, rRight);
+			//if (i == REF_CAM)
+			//{
+			//	startTime = clock();
+			//	//Mask out the complete ROI
+			//	//maskOutOverlapping(depthMat[i], rLeft, rRight);
+			//	//Selective Mask out
+			//	//maskOutOverlappingSelective(depthMat[i], rLeft, rRight);
+			//	//Selective Mask Out Edge
+			//	//maskOutOverlappingEdge(depthMat[0], depthMat[1], depthMat[2]);
+			//	//Selective Points Mask out 
+			//	maskOutOverlappingPointSel(depthMat[i], rLeft, rRight);
 
-				updateDepthImage(depthImages[i], depthMat[i]);
-				totalIntervals[ROI] += clock() - startTime; //time debugging
-				line(depthImages[i], Point(pr0->X, 0), Point(pr0->X, 480), Scalar(0,0,255));
-				line(depthImages[i], Point(pr1->X, 0), Point(pr1->X, 480), Scalar(0,0,255));
-			}
+			//	updateDepthImage(depthImages[i], depthMat[i]);
+			//	totalIntervals[ROI] += clock() - startTime; //time debugging
+			//	line(depthImages[i], Point(pr0->X, 0), Point(pr0->X, 480), Scalar(0,0,255));
+			//	line(depthImages[i], Point(pr1->X, 0), Point(pr1->X, 480), Scalar(0,0,255));
+			//}
 
 
 			//to create a mask for the noise (depth img is threhold)
@@ -581,6 +583,11 @@ int main(int argc, char* argv[])
 					kinects[i].arrayBackProject(pointsFore2D[i], points3D[i], numberOfForegroundPoints[i]);
 
 					kinects[i].transformArray(points3D[i], numberOfForegroundPoints[i]);
+
+					//if (i == 0)
+					//	for (int s = 0; s < numberOfForegroundPoints[i]; s++)
+					//		outDebugFile << (float)points3D[i][s].X << ", " << (float)points3D[i][s].Y << ", " << (float)points3D[i][s].Z << endl;
+
 										
 					updateActivityMap(*activityMap, *activityMap_Back, &actMapCreator, points3D[i], numberOfForegroundPoints[i], pointsFore2D[i]);
 					delete []points3D[i];
@@ -618,10 +625,12 @@ int main(int argc, char* argv[])
 		line(depthImages[0], Point(615, 0), Point(615, 480), Scalar(255,0,0));
 		line(depthImages[2], Point(20, 0), Point(20, 480), Scalar(255,0,0));
 
-		imshow("depth 0", depthImages[0]);
-		imshow("depth 1", depthImages[1]);
-		imshow("depth 2", depthImages[2]);
+		imshow("depth 0", rgbImages[0]);
+		imshow("depth 1", rgbImages[1]);
+		imshow("depth 2", rgbImages[2]);
 
+		//if (frames == 265)
+		//	waitTime = 0;
 		int c = waitKey(waitTime);
 		bShouldStop = (c == 27);
 		if (c == 13)
